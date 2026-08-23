@@ -56,6 +56,12 @@ Write the exact signatures before implementing:
 - The set of methods the array backend must support (which broadcasts, reductions,
   `mul!` forms, views). Keep this set as small as possible; every entry is a
   portability constraint. No scalar indexing of backend arrays in inner loops.
+- Nothing about the element type. Signatures are generic in `T<:Number`; a concrete
+  floating point type must not appear in a method signature, and every constant,
+  threshold, and tolerance is derived from `T` through `realtype` and
+  `unit_roundoff`. If the algorithm genuinely cannot be written for some supported
+  element type, that restriction is a documented design decision with a stated
+  reason, not an untested assumption.
 
 ## 4. Define completion criteria
 
@@ -70,8 +76,12 @@ Adopt the measures used by the reference implementations. Typically:
 - **Agreement with a trusted reference.** On `Array` inputs, results agree with
   LAPACK via `LinearAlgebra` up to the accuracy of the problem and the appropriate
   invariances (sign, phase, ordering, and the choice of basis within an eigenspace).
-- **Backend parity.** The same test set passes for every type in `ARRAY_TYPES` and
-  every type in `ELEMENT_TYPES`, real and complex.
+- **Backend parity.** The same test set passes for every type in `ARRAY_TYPES`.
+- **Element type coverage.** The same test set passes for every type in
+  `element_types(AT)` for each backend, real and complex, including the low
+  precision types. Tolerances scale with `unit_roundoff(T)`, so the same assertion
+  holds in `Float16` and in `Float64` without a separate case. A new element type
+  must require no change to `src`.
 - **Edge cases.** Empty and 1-by-1 inputs, tall and wide rectangles, exact rank
   deficiency, repeated and clustered eigenvalues or singular values, entries scaled
   near the overflow and underflow thresholds, and matrices that are already in the
@@ -102,7 +112,7 @@ A feature is not done until all of the following hold:
 - Every exported name has a docstring stating what is computed, the conditions on
   the input, and the properties of the output.
 - A matching `test/test_<feature>.jl` is included from `test/runtests.jl` and loops
-  over `ARRAY_TYPES` and `ELEMENT_TYPES`.
+  over `ARRAY_TYPES` and, for each, over `element_types(AT)`.
 - `Pkg.test()` passes.
 - `docs/roadmap.md` reflects the new state.
 - `.plan/current.md` is updated: criteria checked off, and the next feature named.

@@ -8,7 +8,9 @@ implemented one at a time via the `plan-feature` workflow.
 
 Package scaffolding, the backend-parametrized test harness, and the conventions for
 accuracy testing (residual, orthogonality, and backward error bounds measured in
-units of the unit roundoff).
+units of the unit roundoff). Element types are discovered by probing the backend, so
+every algorithm is tested against everything the backend supports and a new element
+type costs no work.
 
 ## Phase 1 — Orthogonal transformations
 

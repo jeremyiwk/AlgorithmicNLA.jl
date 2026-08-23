@@ -21,8 +21,10 @@ validated, and well documented over broad coverage that is not.
 - `src/` — one algorithm per file, included from `src/AlgorithmicNLA.jl`.
   `src/common.jl` holds shared utilities (`realtype`, `unit_roundoff`).
 - `test/` — `runtests.jl` includes one `test_<feature>.jl` per feature.
-  `test/testsuite.jl` defines `ARRAY_TYPES` and `ELEMENT_TYPES`; every test set loops
-  over both, so a backend is validated by the same tests as the reference path.
+  `test/testsuite.jl` defines `ARRAY_TYPES`, the element type probe `element_types`,
+  and the test problem generator `testmatrix`; every test set loops over the array
+  types and over the element types each one supports, so a backend and an element
+  type are validated by the same tests as the reference path.
 - `docs/roadmap.md` — the coarse phase ordering of the work.
 - `.plan/current.md` — gitignored working memory for the feature in progress.
 - `.claude/skills/plan-feature/` — the workflow for adding a feature.
@@ -84,7 +86,34 @@ needs explaining — a non-obvious scaling to avoid overflow, a deviation from t
 textbook algorithm, a backend-specific workaround — and write it to the same
 precision standard as a docstring.
 
-### 4. Backend portability
+### 4. Element type genericity
+
+Every algorithm must work for every element type the backend supports, and adding a
+new element type must cost nothing beyond one line in `CANDIDATE_ELEMENT_TYPES` in
+the test harness.
+
+- Never dispatch on, or annotate an argument with, a concrete floating point type.
+  Write `T<:Number` and derive everything else from it.
+- Derive constants and tolerances from the element type: `zero(T)`, `one(T)`,
+  `T(2)`, `realtype(T)`, `unit_roundoff(T)`. No floating point literals in algorithm
+  code, no fixed tolerances such as `1e-8`, and no `eps()` without an argument.
+- Do not assume the element type is a double precision hardware float. The supported
+  set includes `Float16` and `BFloat16`, whose unit roundoff is about `5e-4` and
+  `4e-3`; a threshold or convergence test tuned to double precision silently fails
+  for them. It also includes `BigFloat`, which has no fixed precision at all.
+- Where accumulation in the element type loses too much accuracy to be useful — a
+  long inner product in `Float16`, say — widen the accumulator deliberately and say
+  so in the docstring. Do not widen silently and do not refuse the type.
+- Which element types a backend supports is discovered by probing (`element_types`),
+  not hard coded, because it varies by backend, device, and driver version.
+
+The failure this guards against is real: with `Metal` and `LinearAlgebra` loaded,
+`lu(Metal.ones(Float16, 10, 10))` segfaults, even though the array is valid and
+arithmetic on it works. Generic fallbacks that reach code assuming BLAS element
+types crash rather than erroring. Testing every algorithm on every supported element
+type is what catches this class of failure here instead of in a user's process.
+
+### 5. Backend portability
 
 Algorithms are written against the `AbstractArray` interface. No scalar indexing of
 backend arrays in inner loops; express work as broadcasts, reductions, views, and
