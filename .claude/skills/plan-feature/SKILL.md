@@ -1,6 +1,6 @@
 ---
 name: plan-feature
-description: Plan, specify, implement, and integrate one AlgorithmicNLA feature (a factorization, decomposition, solver, or supporting kernel). Use when starting new numerical linear algebra work, when the user asks to add or plan an algorithm, or when picking up the next item from docs/roadmap.md.
+description: Plan, specify, implement, and integrate one AlgorithmicNLA feature (a factorization, decomposition, solver, or supporting kernel). Use when starting new numerical linear algebra work, when the user asks to add or plan an algorithm, or when picking up the next item from docs/src/roadmap.md.
 ---
 
 # Planning a feature
@@ -16,7 +16,7 @@ roadmap.
 
 ## 1. Scope the feature
 
-Read `.plan/current.md` and `docs/roadmap.md`. Confirm which feature is next and
+Read `.plan/current.md` and `docs/src/roadmap.md`. Confirm which feature is next and
 what it depends on. If a dependency is missing, that dependency is the feature.
 
 State in one sentence what the feature computes, in the language of the literature.
@@ -114,5 +114,5 @@ A feature is not done until all of the following hold:
 - A matching `test/test_<feature>.jl` is included from `test/runtests.jl` and loops
   over `ARRAY_TYPES` and, for each, over `element_types(AT)`.
 - `Pkg.test()` passes.
-- `docs/roadmap.md` reflects the new state.
+- `docs/src/roadmap.md` reflects the new state.
 - `.plan/current.md` is updated: criteria checked off, and the next feature named.

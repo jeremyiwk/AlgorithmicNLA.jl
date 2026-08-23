@@ -35,6 +35,12 @@ jobs:
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+      - uses: julia-actions/julia-processcoverage@v1
+      - uses: codecov/codecov-action@v5
+        with:
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
   aqua:
     name: Aqua QA
@@ -45,15 +51,17 @@ jobs:
         with:
           version: '1'
       - uses: julia-actions/cache@v2
-      - name: Run Aqua.test_all
+      - name: Run Aqua.test_all and ExplicitImports
         run: |
           julia --color=yes -e '
             using Pkg
             Pkg.activate(temp = true)
             Pkg.develop(path = ".")
-            Pkg.add("Aqua")
-            using Aqua, AlgorithmicNLA
-            Aqua.test_all(AlgorithmicNLA)'
+            Pkg.add(["Aqua", "ExplicitImports"])
+            using Aqua, ExplicitImports, AlgorithmicNLA
+            Aqua.test_all(AlgorithmicNLA)
+            check_no_implicit_imports(AlgorithmicNLA)
+            check_no_stale_explicit_imports(AlgorithmicNLA)'
 
   format:
     name: Runic formatting

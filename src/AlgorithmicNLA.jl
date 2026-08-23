@@ -9,7 +9,7 @@ factorization or decomposition, included below.
 """
 module AlgorithmicNLA
 
-using LinearAlgebra
+using LinearAlgebra: LinearAlgebra
 
 include("common.jl")
 
