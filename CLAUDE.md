@@ -1,0 +1,93 @@
+# AlgorithmicNLA.jl
+
+## What this project is
+
+A Julia package of numerical linear algebra algorithms that abstract over the
+**array backend**. The relationship to `GenericLinearAlgebra.jl` is deliberate:
+where that package abstracts over the *element type* so that algorithms run for
+`BigFloat`, `Double64`, and friends, this package abstracts over the *array type* so
+that the same algorithms run on CPU arrays, `MtlArray`, `CuArray`, and whatever
+comes next.
+
+- **Ultimate goal:** portable, high quality linear algebra across GPU backends.
+- **Proximate goal:** a library abstract enough to be backend-agnostic and complete
+  enough to fill the gaps in `Metal.jl`'s coverage of the `LinearAlgebra` API.
+
+Quality is the point. Prefer a small number of algorithms that are correct,
+validated, and well documented over broad coverage that is not.
+
+## Layout
+
+- `src/` — one algorithm per file, included from `src/AlgorithmicNLA.jl`.
+  `src/common.jl` holds shared utilities (`realtype`, `unit_roundoff`).
+- `test/` — `runtests.jl` includes one `test_<feature>.jl` per feature.
+  `test/testsuite.jl` defines `ARRAY_TYPES` and `ELEMENT_TYPES`; every test set loops
+  over both, so a backend is validated by the same tests as the reference path.
+- `docs/roadmap.md` — the coarse phase ordering of the work.
+- `.plan/current.md` — gitignored working memory for the feature in progress.
+- `.claude/skills/plan-feature/` — the workflow for adding a feature.
+
+## Workflow
+
+Adding or planning any algorithm goes through the `plan-feature` skill. It defines
+the sequence: scope the feature, survey reference implementations, fix the
+interface, define numerical completion criteria, write `.plan/current.md`, implement,
+integrate. Read `.plan/current.md` at the start of a session to recover context.
+
+Run the tests with:
+
+```
+julia --project=. -e 'using Pkg; Pkg.test()'
+```
+
+## Development best practices
+
+### 1. Follow existing high quality libraries
+
+Before designing anything, look at how it has already been done well, and reuse it.
+`GenericLinearAlgebra.jl` is the primary model for module layout, naming, algorithm
+structure, and test organization. `LinearAlgebra` (stdlib) defines the API surface to
+match: function names, argument order, keyword arguments, factorization types, and
+`Factorization` accessors. LAPACK is the algorithmic reference for storage
+conventions, scaling, and edge case handling. Reuse their correctness, validation,
+and robustness measures — the error bounds their tests assert, the invariances they
+account for, the degenerate inputs they cover — rather than inventing our own. A
+deviation from an established interface needs a stated reason.
+
+### 2. Mathematical clarity in names
+
+Function and variable names match the nomenclature of the literature and of LAPACK
+as closely as the language allows: `A`, `Q`, `R`, `tau`, `householder`, `bidiagonalize`,
+`wilkinson_shift`. A reader who knows Golub & Van Loan should recognize the code.
+
+Avoid special symbols and non-ASCII characters unless they are already used for the
+same purpose in the standard library (`I`, `∘`, `⋅`, `'` are fine because stdlib uses
+them; `σ`, `λ`, `α` as variable names are not — write `sigma`, `lambda`, `alpha`).
+Do not abbreviate past the point of recognition, and do not expand standard
+abbreviations into prose.
+
+### 3. Docstrings and comments
+
+Docstrings are mathematically precise and concise. State what is computed, the
+conditions on the input, and the properties of the output. Use a term only in its
+precise mathematical sense: *orthogonal*, *unitary*, *nonsingular*, *positive
+definite*, *backward stable*, *rank* mean exactly what they mean in the literature.
+Do not use a vague word where a precise counterpart exists — not "roughly equal" but
+a stated bound; not "fast" but a stated complexity; not "stable" unless the stability
+is the documented kind.
+
+No marketing, no restating the signature in words, no examples unless the usage is
+genuinely non-obvious.
+
+Code comments are the exception, not the rule. Add one only where something truly
+needs explaining — a non-obvious scaling to avoid overflow, a deviation from the
+textbook algorithm, a backend-specific workaround — and write it to the same
+precision standard as a docstring.
+
+### 4. Backend portability
+
+Algorithms are written against the `AbstractArray` interface. No scalar indexing of
+backend arrays in inner loops; express work as broadcasts, reductions, views, and
+`mul!`. Keep the set of operations a backend must support small and record it when
+planning a feature — every entry is a portability constraint. Write and validate the
+`Array` path against LAPACK first, then generalize.

@@ -1,0 +1,20 @@
+name = "AlgorithmicNLA"
+uuid = "86ca9561-def2-43cb-8c3d-c166b1cf2663"
+authors = ["Jeremy Welsh-Kavan"]
+version = "0.1.0-DEV"
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+
+[compat]
+LinearAlgebra = "1"
+Random = "1"
+Test = "1"
+julia = "1.10"
+
+[extras]
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test", "Random"]
