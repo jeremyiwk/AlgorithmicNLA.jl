@@ -10,6 +10,8 @@ The goal of ``AlgorithmicNLA.jl`` is to provide an interface for "abstract" nume
 
 The ultimate goal is to fully abstract the backend. The proximate goal is to fill out the features currently lacking from ``Metal.jl``.
 
+Documentation: [jeremyiwk.github.io/AlgorithmicNLA.jl/dev](https://jeremyiwk.github.io/AlgorithmicNLA.jl/dev/)
+
 Supported Julia versions: 1.10 (current LTS) and later.
 
 Contributions follow the [ColPrac](https://github.com/SciML/ColPrac) contributor guide.
