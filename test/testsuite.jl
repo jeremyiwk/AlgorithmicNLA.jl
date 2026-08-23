@@ -23,9 +23,11 @@ Every element type the suite knows how to build a test problem for. Which of the
 given backend actually supports is decided at run time by `element_types`;
 supporting a new element type means adding it to this tuple and nothing else.
 """
-const CANDIDATE_ELEMENT_TYPES = (Float16, Float32, Float64, BFloat16, BigFloat,
-                                 ComplexF16, ComplexF32, ComplexF64,
-                                 Complex{BFloat16}, Complex{BigFloat})
+const CANDIDATE_ELEMENT_TYPES = (
+    Float16, Float32, Float64, BFloat16, BigFloat,
+    ComplexF16, ComplexF32, ComplexF64,
+    Complex{BFloat16}, Complex{BigFloat},
+)
 
 """
     element_types(ArrayType)
@@ -69,11 +71,11 @@ referencetype(::Type{<:Complex}) = ComplexF64
 An array of independent entries uniform on `[-1, 1]` for real `T`, and with real and
 imaginary parts independent and uniform on `[-1, 1]` for complex `T`.
 """
-function uniform(rng::AbstractRNG, ::Type{R}, dims::Integer...) where {R<:Real}
+function uniform(rng::AbstractRNG, ::Type{R}, dims::Integer...) where {R <: Real}
     return 2 .* rand(rng, R, dims...) .- one(R)
 end
 
-function uniform(rng::AbstractRNG, ::Type{Complex{R}}, dims::Integer...) where {R<:Real}
+function uniform(rng::AbstractRNG, ::Type{Complex{R}}, dims::Integer...) where {R <: Real}
     return complex.(uniform(rng, R, dims...), uniform(rng, R, dims...))
 end
 
@@ -86,7 +88,7 @@ generated in double precision and then rounded to `T`, so the same `seed` gives 
 same matrix in every element type and results across precisions are directly
 comparable.
 """
-function testmatrix(::Type{AT}, ::Type{T}, m::Integer, n::Integer; seed = 0) where {AT,T}
+function testmatrix(::Type{AT}, ::Type{T}, m::Integer, n::Integer; seed = 0) where {AT, T}
     rng = MersenneTwister(seed)
     A = uniform(rng, referencetype(T), m, n)
     return convert(AT{T}, T.(A))

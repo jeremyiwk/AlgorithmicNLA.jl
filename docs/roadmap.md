@@ -50,3 +50,12 @@ holds).
 
 Full coverage of the relevant `LinearAlgebra` API (factorization objects, `\`,
 in-place variants), documentation, and registration.
+
+## Performance goal
+
+Benchmarks live in `benchmarks/` and are direct measurements of performance, not
+proxies. The standing target: for every algorithm, the Metal array path runs faster
+than the CPU array path once the problem size is large enough, and the crossover
+size is measured and reported per algorithm and element type. An algorithm whose
+GPU path never overtakes the CPU at any size has a portability or blocking problem
+to fix, not a benchmark to excuse.

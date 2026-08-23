@@ -42,6 +42,31 @@ Run the tests with:
 julia --project=. -e 'using Pkg; Pkg.test()'
 ```
 
+## CI and merge standards
+
+CI (`.github/workflows/CI.yml`) runs on every push to `main` and every pull
+request, and all three jobs must pass before merging into `main`:
+
+1. **Tests** — `Pkg.test()` on the oldest supported Julia (see `[compat]`) and the
+   latest stable release, on Linux and macOS.
+2. **Aqua QA** — `Aqua.test_all(AlgorithmicNLA)`: method ambiguities, unbound type
+   parameters, undefined exports, stale dependencies, missing compat bounds, type
+   piracy. Reproduce locally with:
+
+   ```
+   julia -e 'using Pkg; Pkg.activate(temp = true); Pkg.develop(path = "."); Pkg.add("Aqua");
+             using Aqua, AlgorithmicNLA; Aqua.test_all(AlgorithmicNLA)'
+   ```
+
+3. **Formatting** — all Julia source must be formatted with
+   [Runic](https://github.com/fredrikekre/Runic.jl). Install it once into a shared
+   environment (`julia -e 'using Pkg; Pkg.activate("runic", shared = true); Pkg.add("Runic")'`),
+   then check with `julia --project=@runic -m Runic --check --diff .` and fix with
+   `julia --project=@runic -m Runic --inplace .`.
+
+Run all three locally before pushing; do not merge with a red check. New compat
+entries must be bounded (Aqua enforces this).
+
 ## Development best practices
 
 ### 1. Follow existing high quality libraries
