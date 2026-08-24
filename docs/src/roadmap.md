@@ -22,12 +22,41 @@ These apply to every phase rather than being phases themselves:
   considered done. Every gate below is evaluated for every array type in
   `ARRAY_TYPES` and every element type the backend supports, with
   `allowscalar(false)` in force on device arrays.
+- **Two testing layers, always both.** Every feature test set asserts the
+  mathematical bounds of its phase gate *and* baseline agreement with the
+  reference implementation on the same input: the measured error must satisfy
+  `err ≤ 10 · max(err_ref, n·u·scale)` (the harness's `within_baseline`) — within
+  an order of magnitude of the reference, floored at one expected unit so an
+  anomalously exact reference does not fail correct rounding. The reference is
+  LAPACK via `LinearAlgebra` where the element type has a LAPACK path (`Float32`,
+  `Float64`, their complex types) and the same computation in `referencetype(T)`
+  otherwise. Baseline comparisons respect the invariances of the factorization:
+  spectra compared after sorting (`compare_spectra`), vectors up to phase
+  (`matches_up_to_phase`), clustered eigenvectors as subspaces
+  (`subspace_distance`) — never raw elementwise equality of non-unique objects.
+- **Identities are asserted over the corpus, not a draw.** Algebraic invariances
+  (shift `eig(A + σI) = eig(A) + σ`, scaling equivariance, orthogonal similarity
+  invariance, transpose relations) run over all of `TEST_SEEDS`, the
+  `condition_sweep(T)` matrices, and the phase's named adversarial matrices — a
+  single random instance is almost always well conditioned and demonstrates
+  nothing.
+- **Conditioning is swept, not sampled.** Gates are evaluated on
+  `conditioned_testmatrix` inputs across `condition_sweep(T)` — well conditioned,
+  `u^{-1/2}`, and near numerically singular — in addition to uniform random
+  matrices.
+- **Nonfinite inputs follow LAPACK:** no input validation, `NaN`/`Inf` propagate
+  to the output. Tests assert the LAPACK behavior — completion without a crash or
+  hang, nonfinite in implies nonfinite (or a reported failure flag) out — and
+  never a silent finite wrong answer.
 - **Benchmarks land with the feature.** Each algorithm adds entries to the
   `benchmarks/` suite keyed by backend, element type, and size.
 - **Docs land with the feature.** Each algorithm's docstring appears in the API
   reference when it merges.
 - **Shape edge cases are part of every gate:** `0×0`, `1×1`, a single row or
   column, tall, wide, and dimensions that are not multiples of any block size.
+- **Regression corpus** (a convention, not part of the gates): every bug that
+  escapes to a reported failure gets its minimal reproducer pinned as a
+  permanent named test, the way the `Metal` `Float16` `lu` segfault already is.
 
 ## Phase 0 — Foundations *(complete)*
 

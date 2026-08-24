@@ -4,7 +4,10 @@ using AlgorithmicNLA
 using BFloat16s
 using LinearAlgebra
 using Random
+using StableRNGs
 using Test
+
+using AlgorithmicNLA: realtype, unit_roundoff
 
 """
     ARRAY_TYPES
@@ -89,7 +92,136 @@ same matrix in every element type and results across precisions are directly
 comparable.
 """
 function testmatrix(::Type{AT}, ::Type{T}, m::Integer, n::Integer; seed = 0) where {AT, T}
-    rng = MersenneTwister(seed)
+    rng = StableRNG(seed)
     A = uniform(rng, referencetype(T), m, n)
     return convert(AT{T}, T.(A))
 end
+
+"""
+    TEST_SEEDS
+
+Seeds every property and identity test loops over. Random matrices are almost
+always well conditioned, so a single instance demonstrates nothing; identities and
+invariances are asserted over this whole family (and, where meaningful, over the
+`condition_sweep` and the named adversarial matrices) rather than on one draw.
+"""
+const TEST_SEEDS = 0:7
+
+"""
+    condition_sweep(T)
+
+Condition numbers for stress testing in element type `T`: well conditioned (`1`),
+moderately ill conditioned (`u^-1/2`), and close to numerically singular
+(`u^-1 / 10`), where `u` is the unit roundoff of `T`. Derived from the element type
+so the sweep is meaningful in every precision: `u^-1/2` is about `1e8` for
+`Float64` but only about `45` for `Float16`.
+"""
+function condition_sweep(::Type{T}) where {T}
+    u = Float64(unit_roundoff(T))
+    return (1.0, inv(sqrt(u)), inv(u) / 10)
+end
+
+"""
+    conditioned_testmatrix(ArrayType, T, m, n; kappa, seed)
+
+An `m`-by-`n` matrix with prescribed 2-norm condition number `kappa`: random
+orthogonal factors around a geometrically graded diagonal (singular values from `1`
+down to `1 / kappa`), in the manner of LAPACK's `xLATMS`. Generated in double
+precision and rounded to `T`, so the same `seed` gives the same matrix in every
+element type. `kappa` should not exceed the largest value in `condition_sweep(T)`,
+beyond which the grading is unrepresentable in `T`. When `min(m, n) == 1` there is
+a single singular value and the condition number is `1` regardless of `kappa`.
+"""
+function conditioned_testmatrix(
+        ::Type{AT}, ::Type{T}, m::Integer, n::Integer;
+        kappa, seed = 0
+    ) where {AT, T}
+    rng = StableRNG(seed)
+    R = referencetype(T)
+    k = min(m, n)
+    sigma = kappa .^ .-range(0.0, 1.0, length = max(k, 2))[1:k]
+    U = Matrix(qr(uniform(rng, R, m, k)).Q)
+    V = Matrix(qr(uniform(rng, R, n, k)).Q)
+    A = U * Diagonal(R.(sigma)) * V'
+    return convert(AT{T}, T.(A))
+end
+
+"""
+    within_baseline(err, referr, n, T, scale; factor = 10)
+
+Whether an error is acceptable relative to a reference implementation's error on
+the same problem. The test is
+
+    err ≤ factor * max(referr, n * u * scale)
+
+with `u = unit_roundoff(T)`: within `factor` (default one order of magnitude) of
+the reference's error, floored at one expected unit `n * u * scale` so that a
+reference which is anomalously exact on a structured input (a triangular or
+orthogonal matrix, say) does not turn an acceptable rounding error into a failure.
+`scale` is the natural size of the quantity being measured — `norm(A)` for a
+factorization residual, `1` for an orthogonality defect.
+
+This is the baseline layer of testing: it bounds how much worse than the reference
+we are, on the same input, independent of the mathematical bound the same test set
+asserts. Reference errors come from LAPACK via `LinearAlgebra` where the element
+type has a LAPACK path (`Float32`, `Float64`, and their complex types) and from the
+same computation carried out in `referencetype(T)` otherwise.
+"""
+function within_baseline(err, referr, n::Integer, ::Type{T}, scale; factor = 10) where {T}
+    u = Float64(unit_roundoff(T))
+    return Float64(err) <= factor * max(Float64(referr), n * u * Float64(scale))
+end
+
+"""
+    compare_spectra(computed, reference; rtol)
+
+Whether two collections of eigenvalues or singular values agree to `rtol` relative
+to the largest reference magnitude, after sorting both by `(real, imag)` so the
+comparison is invariant to output ordering. Complex conjugate pairs must agree
+pairwise. This is the only meaningful direct comparison for spectra; individual
+eigenvector comparison is not (see `subspace_distance`).
+"""
+function compare_spectra(computed, reference; rtol)
+    length(computed) == length(reference) || return false
+    by = x -> (real(x), imag(x))
+    c, r = sort(collect(computed); by), sort(collect(reference); by)
+    scale = maximum(abs, r; init = 0.0)
+    return all(abs.(c .- r) .<= rtol * max(scale, one(scale)))
+end
+
+"""
+    matches_up_to_phase(u, v; atol)
+
+Whether two unit vectors agree up to a unimodular phase (a sign, in the real
+case): `min over phase of norm(u - phase * v) ≤ atol`, computed as
+`norm(u - sign(dot(v, u)) * v)`. Eigenvectors and singular vectors are defined
+only up to phase, so direct comparison without this alignment is meaningless.
+Only valid for well separated eigenvalues; for clustered ones compare the spanned
+subspaces with `subspace_distance` instead.
+"""
+function matches_up_to_phase(u, v; atol)
+    s = dot(v, u)
+    phase = iszero(s) ? one(s) : s / abs(s)
+    return norm(u .- phase .* v) <= atol
+end
+
+"""
+    subspace_distance(U, V)
+
+The sine of the largest principal angle between the column spans of the orthonormal
+`U` and `V`. This is the correct way to compare computed eigenvector or singular
+vector bases when eigenvalues are clustered: the individual vectors within a
+cluster are not well determined, but the spanned subspace is, and this distance is
+small exactly when the subspaces agree. Near-zero angles are resolved only to
+about `sqrt(u)` of the working precision (the `sqrt(1 - s^2)` form loses half the
+digits there), so tolerances on this quantity must not be tighter than that.
+"""
+function subspace_distance(U, V)
+    s = svdvals(U' * V)
+    smin = isempty(s) ? one(real(eltype(U))) : minimum(s)
+    return sqrt(max(zero(smin), one(smin) - smin^2))
+end
+
+# Make the exercised configuration visible in every test log, so a coverage
+# regression (a backend or element type silently dropping out) is observable.
+@info "AlgorithmicNLA test configuration" [AT => element_types(AT) for AT in ARRAY_TYPES]
