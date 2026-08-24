@@ -147,19 +147,26 @@ function conditioned_testmatrix(
 end
 
 """
-    within_baseline(err, referr, n, T, scale; factor = 10)
+    within_baseline(err, referr, n, T, scale; factor = 4)
 
 Whether an error is acceptable relative to a reference implementation's error on
 the same problem. The test is
 
     err ≤ factor * max(referr, n * u * scale)
 
-with `u = unit_roundoff(T)`: within `factor` (default one order of magnitude) of
-the reference's error, floored at one expected unit `n * u * scale` so that a
-reference which is anomalously exact on a structured input (a triangular or
+with `u = unit_roundoff(T)`, floored at one expected unit `n * u * scale` so that
+a reference which is anomalously exact on a structured input (a triangular or
 orthogonal matrix, say) does not turn an acceptable rounding error into a failure.
 `scale` is the natural size of the quantity being measured — `norm(A)` for a
 factorization residual, `1` for an orthogonality defect.
+
+The default `factor = 4` is chosen for implementations of the *same algorithm* as
+the reference: backward error then differs only through evaluation order and
+blocking, which move the constant by factors near `√2`–`2` and essentially never
+beyond `3`, while a genuine defect grows with `n`, `κ`, or `1/u` and exceeds any
+constant factor immediately. A deliberately different algorithm with a genuinely
+different error constant may pass a larger `factor` explicitly, with a comment
+saying why.
 
 This is the baseline layer of testing: it bounds how much worse than the reference
 we are, on the same input, independent of the mathematical bound the same test set
@@ -167,7 +174,7 @@ asserts. Reference errors come from LAPACK via `LinearAlgebra` where the element
 type has a LAPACK path (`Float32`, `Float64`, and their complex types) and from the
 same computation carried out in `referencetype(T)` otherwise.
 """
-function within_baseline(err, referr, n::Integer, ::Type{T}, scale; factor = 10) where {T}
+function within_baseline(err, referr, n::Integer, ::Type{T}, scale; factor = 4) where {T}
     u = Float64(unit_roundoff(T))
     return Float64(err) <= factor * max(Float64(referr), n * u * Float64(scale))
 end

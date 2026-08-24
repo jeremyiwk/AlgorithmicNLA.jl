@@ -25,9 +25,13 @@ These apply to every phase rather than being phases themselves:
 - **Two testing layers, always both.** Every feature test set asserts the
   mathematical bounds of its phase gate *and* baseline agreement with the
   reference implementation on the same input: the measured error must satisfy
-  `err ≤ 10 · max(err_ref, n·u·scale)` (the harness's `within_baseline`) — within
-  an order of magnitude of the reference, floored at one expected unit so an
-  anomalously exact reference does not fail correct rounding. The reference is
+  `err ≤ 4 · max(err_ref, n·u·scale)` (the harness's `within_baseline`) — floored
+  at one expected unit so an anomalously exact reference does not fail correct
+  rounding. The factor `4` reflects that we implement the *same algorithms* as the
+  reference: evaluation order and blocking move the error constant by factors
+  near `√2`–`2`, essentially never beyond `3`, while a genuine defect grows with
+  `n`, `κ`, or `1/u` and exceeds any constant immediately. A deliberately
+  different algorithm may pass a larger factor explicitly, with a stated reason. The reference is
   LAPACK via `LinearAlgebra` where the element type has a LAPACK path (`Float32`,
   `Float64`, their complex types) and the same computation in `referencetype(T)`
   otherwise. Baseline comparisons respect the invariances of the factorization:
