@@ -4,7 +4,7 @@
 AlgorithmicNLA.AlgorithmicNLA
 ```
 
-## Utilities
+## Arrays and utilities
 
 ```@autodocs
 Modules = [AlgorithmicNLA]

@@ -1,12 +1,14 @@
 name = "AlgorithmicNLA"
 uuid = "86ca9561-def2-43cb-8c3d-c166b1cf2663"
-authors = ["Jeremy Welsh-Kavan"]
 version = "0.1.0-DEV"
+authors = ["Jeremy Welsh-Kavan"]
 
 [deps]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [compat]
+Adapt = "4.7.0"
 BFloat16s = "0.5, 0.6"
 LinearAlgebra = "1"
 Random = "1"

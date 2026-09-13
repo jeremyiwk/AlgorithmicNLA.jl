@@ -10,7 +10,13 @@ factorization or decomposition, included below.
 module AlgorithmicNLA
 
 using LinearAlgebra: LinearAlgebra
+using Adapt: Adapt
+using Base: Broadcast
+
+export NLAArray
 
 include("common.jl")
+include("array.jl")
+include("lu.jl")
 
 end # module

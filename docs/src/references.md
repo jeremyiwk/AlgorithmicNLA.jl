@@ -27,19 +27,36 @@ sufficient for every phase of the roadmap.
 
 ## Code and documentation
 
+- **Julia's [array and broadcast interfaces](https://docs.julialang.org/en/v1/manual/interfaces/)
+  and [Adapt.jl](https://github.com/JuliaGPU/Adapt.jl)** — the `NLAArray` wrapper's
+  allocation, aliasing, broadcasting, and backend-conversion contracts.
+
 - **LAPACK** — [source](https://github.com/Reference-LAPACK/lapack), the
   [Users' Guide](https://www.netlib.org/lapack/lug/), and the
   [LAPACK Working Notes](https://www.netlib.org/lapack/lawns/) — the
   implementation reference: storage conventions, scaling strategies
-  (`xLARFG`, `xLASSQ`, `xLATRS`), edge-case handling, and the test-ratio
-  methodology the harness's `within_baseline` imitates.
-- **`LinearAlgebra` (stdlib)** — the API surface to match: names, argument
-  order, factorization types, accessors.
+  (`xLARFG`, `xLASSQ`, `xLATRS`), edge-case handling, and the numerical test
+  routines and driver thresholds that define the feature gates.
+- **`LinearAlgebra` (stdlib)** — the first reference for both algorithms
+  (including delegated routines) and API: names, argument order, factorization
+  types, accessors. Where backend portability prevents matching it, use LAPACK.
 - **`GenericLinearAlgebra.jl`** — the closest sibling: module layout, naming,
   and the reference for element-type-generic algorithm structure; also the
   same-precision reference implementation for element types LAPACK cannot run.
-- **`GPUArrays.jl` / `Metal.jl` / `CUDA.jl`** — how backend-agnostic array code
-  avoids scalar indexing and what primitives backends actually provide.
+- **`GPUArrays.jl` / `Metal.jl` / `CUDA.jl` / `AMDGPU.jl`** — how backend-agnostic
+  array code avoids scalar indexing and what primitives backends actually provide.
+  AMDGPU's [rocSOLVER wrappers](https://github.com/JuliaGPU/AMDGPU.jl/blob/main/src/solver/highlevel.jl)
+  also provide a reference for device pivot storage and host status handling at
+  solver boundaries, added for the LU portability design. Its underlying
+  [rocSOLVER GETF2 implementation](https://github.com/ROCm/rocSOLVER/blob/develop/library/src/lapack/roclapack_getf2.hpp)
+  provides the open-source comparison for device reductions and pivot handling.
+- **[Metal Shading Language specification](https://developer.apple.com/metal/Metal-Shading-Language-Specification.pdf)**,
+  section 8.1 — the hardware arithmetic contract, added to document why native
+  Metal LU cannot promise CPU LAPACK's gradual-underflow behavior for subnormals.
+- **[Metal profiling](https://metal.juliagpu.org/stable/profiling/) and
+  [KernelAbstractions API](https://juliagpu.github.io/KernelAbstractions.jl/stable/api/)**
+  — added for the reusable GPU performance workflow and to evaluate cooperative
+  panel kernels with explicit workgroup storage and synchronization.
 
 ## Deliberately not in the set
 

@@ -10,6 +10,9 @@ makedocs(
     ),
     pages = [
         "Home" => "index.md",
+        "Array interface" => "arrays.md",
+        "LU factorization" => "lu.md",
+        "GPU performance workflow" => "performance.md",
         "Roadmap" => "roadmap.md",
         "API reference" => "api.md",
         "References" => "references.md",

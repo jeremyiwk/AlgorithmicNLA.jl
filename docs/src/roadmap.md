@@ -1,14 +1,18 @@
 # Roadmap
 
-A coarse ordering of the work. Phases are sequenced so that each one supplies the
-building blocks the next one needs; within a phase, features are planned and
-implemented one at a time via the `plan-feature` workflow.
+A coarse grouping of the work. The initial implementation order is LU, Cholesky,
+then QR, adding the necessary primitives with each feature. The phase numbers
+below group related work rather than requiring all primitives before LU.
+Features are planned and implemented one at a time.
 
 Each phase lists its **deliverables** — the concrete types and functions it adds —
 and a **phase gate**: the test criteria that define completion. The gates are a
-developer contract: a phase is complete only when its gate passes in CI, a gate may
-be strengthened but never weakened once written, and a feature that cannot meet its
-gate is redesigned, not exempted. Throughout, `u` denotes the unit roundoff of the
+developer contract: a phase is complete only when its gate passes in CI. Numerical
+gates must match the corresponding LAPACK tests and driver thresholds. The bounds
+below are provisional summaries; during feature planning, replace any conflicting
+claim with the sourced criterion, recording the reference routine and version.
+Do not relax a sourced gate to accommodate an implementation failure. Throughout,
+`u` denotes the unit roundoff of the
 element type and `c` a modest constant independent of the matrix; "reference" means
 LAPACK via `LinearAlgebra` on the `Array` path.
 
@@ -16,25 +20,28 @@ LAPACK via `LinearAlgebra` on the `Array` path.
 
 These apply to every phase rather than being phases themselves:
 
+- **Reference algorithms determine the implementation.** Match `LinearAlgebra`
+  as closely as possible, including its delegated routines; where portability
+  prevents that, match LAPACK. A simpler or suboptimal variant is acceptable only
+  where LAPACK also uses it for that operation and problem regime. This rule
+  governs the provisional algorithm choices in later phases as well: blocking or
+  robustness measures used by the reference cannot be deferred merely for ease
+  of implementation.
 - **Backend validation is continuous, not deferred.** Every algorithm is written
   against the `AbstractArray` interface, validated on the `Array` path against
   LAPACK first, and then run against at least one GPU backend (Metal) before it is
   considered done. Every gate below is evaluated for every array type in
   `ARRAY_TYPES` and every element type the backend supports, with
   `allowscalar(false)` in force on device arrays.
-- **Two testing layers, always both.** Every feature test set asserts the
-  mathematical bounds of its phase gate *and* baseline agreement with the
-  reference implementation on the same input: the measured error must satisfy
-  `err ≤ 4 · max(err_ref, n·u·scale)` (the harness's `within_baseline`) — floored
-  at one expected unit so an anomalously exact reference does not fail correct
-  rounding. The factor `4` reflects that we implement the *same algorithms* as the
-  reference: evaluation order and blocking move the error constant by factors
-  near `√2`–`2`, essentially never beyond `3`, while a genuine defect grows with
-  `n`, `κ`, or `1/u` and exceeds any constant immediately. A deliberately
-  different algorithm may pass a larger factor explicitly, with a stated reason. The reference is
-  LAPACK via `LinearAlgebra` where the element type has a LAPACK path (`Float32`,
-  `Float64`, their complex types) and the same computation in `referencetype(T)`
-  otherwise. Baseline comparisons respect the invariances of the factorization:
+- **Numerical gates follow LAPACK.** Adopt the corresponding LAPACK test
+  routines, matrix families, norms, normalizations, safe-minimum handling, and
+  driver thresholds. Record the precision convention explicitly; do not assume
+  a reference's epsilon equals this package's unit roundoff. Reference comparisons
+  use `LinearAlgebra` where available and a suitable generic or higher-precision
+  implementation otherwise, evaluated on the same represented input. Document
+  adaptations for types LAPACK cannot execute. The existing `within_baseline`
+  helper is provisional and its factor of four is not a universal requirement.
+  Comparisons respect the invariances of the factorization:
   spectra compared after sorting (`compare_spectra`), vectors up to phase
   (`matches_up_to_phase`), clustered eigenvectors as subspaces
   (`subspace_distance`) — never raw elementwise equality of non-unique objects.
@@ -48,19 +55,22 @@ These apply to every phase rather than being phases themselves:
   `conditioned_testmatrix` inputs across `condition_sweep(T)` — well conditioned,
   `u^{-1/2}`, and near numerically singular — in addition to uniform random
   matrices.
-- **Nonfinite inputs follow LAPACK:** no input validation, `NaN`/`Inf` propagate
-  to the output. Tests assert the LAPACK behavior — completion without a crash or
-  hang, nonfinite in implies nonfinite (or a reported failure flag) out — and
-  never a silent finite wrong answer.
+- **Nonfinite inputs follow the reference interface.** Match `LinearAlgebra`'s
+  validation and error behavior for the relevant operation and keywords; where
+  that cannot be matched, document the corresponding LAPACK behavior. Specify
+  this per routine rather than imposing universal propagation or validation.
 - **Benchmarks land with the feature.** Each algorithm adds entries to the
-  `benchmarks/` suite keyed by backend, element type, and size.
+  `benchmarks/` suite keyed by backend, element type, and size. Apply the
+  [GPU performance workflow](performance.md), including a bounded review of
+  actual update shapes, compilation, small-operation fusion, and blocking.
 - **Docs land with the feature.** Each algorithm's docstring appears in the API
   reference when it merges.
 - **Shape edge cases are part of every gate:** `0×0`, `1×1`, a single row or
   column, tall, wide, and dimensions that are not multiples of any block size.
 - **Regression corpus** (a convention, not part of the gates): every bug that
   escapes to a reported failure gets its minimal reproducer pinned as a
-  permanent named test, the way the `Metal` `Float16` `lu` segfault already is.
+  permanent named test. Pin the recorded `Metal` `Float16` `lu` failure when LU
+  lands; the scaffolding does not yet contain that regression test.
 
 ## Phase 0 — Foundations *(complete)*
 
@@ -69,6 +79,11 @@ accuracy testing (residual, orthogonality, and backward error bounds measured in
 units of the unit roundoff). Element types are discovered by probing the backend.
 
 ## Phase 1 — Primitives
+
+The `NLAArray` prerequisite provides backend-preserving array operations.
+Numerical LU now uses this package's implementation; QR delegates to the backend
+until its numerical implementation is added. See [Array interface](arrays.md)
+and [LU factorization](lu.md) for scope and validation. Cholesky is next, then QR.
 
 The building blocks everything later reuses. Triangular solves sit here, not after
 the eigensolvers, because least squares in Phase 2 already requires them and because
@@ -125,12 +140,13 @@ The highest-demand gap-fillers for `Metal.jl`, built directly on Phase 1.
 - Cholesky: `‖A − LLᴴ‖ ≤ c·n·u·‖A‖` on SPD test matrices across the condition
   range `1 … 1/(n·u)`; indefinite input fails at the same pivot index as
   reference, and never returns a factor silently.
-- LU: `‖PA − LU‖ ≤ c·g·n·u·‖A‖` with `g` the growth factor; the Wilkinson
-  worst-case growth matrix (`g = 2ⁿ⁻¹`) is included so the bound is honest, not
-  hidden; pivot sequence matches reference on the `Array` path; exact singularity
-  is reported at the correct column. The `Metal` `Float16` case that segfaults
-  through the stdlib fallback completes correctly — this single test is the
-  package's reason to exist and is pinned permanently.
+- LU: LAPACK 3.12.1 GET01 reconstruction and GET02 solve ratios are below 30,
+  using LAMCH('E') and the documented complex norm conventions. The eleven GE
+  matrix families, Wilkinson growth example, pivot ties, exact singularity,
+  rectangular/block-boundary shapes, and strided views are covered. See
+  [LU numerical validation](lu.md#Numerical-validation) for precision adaptations
+  and the accepted backend subnormal limitation. Metal Float16 factorizations
+  and solves execute with scalar indexing disabled through this implementation.
 
 ## Phase 3 — Symmetric and Hermitian eigenvalue problem
 
@@ -294,3 +310,10 @@ than the CPU array path once the problem size is large enough, and the crossover
 size is measured and reported per algorithm and element type. An algorithm whose
 GPU path never overtakes the CPU at any size has a portability or blocking problem
 to fix, not a benchmark to excuse.
+
+A crossover is expected only once the workload becomes compute-bound, with most
+work in GEMMs; it need not occur as soon as that condition holds. Small matrices
+are not required to beat CPU. They still require efficient GPU execution:
+avoid unnecessary allocations, synchronization, and excessive small operations.
+Profile those costs separately from GEMM throughput before choosing custom
+kernels or changing the implementation strategy.
